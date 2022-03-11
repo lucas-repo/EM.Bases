@@ -25,13 +25,16 @@ namespace EM.Bases
         /// 实例化委托命令
         /// </summary>
         /// <param name="execute">执行委托</param>
-        public DelegateCommand(Action execute) : this(execute, null) { }
+        public DelegateCommand(Action execute) : this(p => execute?.Invoke()) { }
 
         /// <summary>
         /// 实例化委托命令
         /// </summary>
         /// <param name="execute">执行委托</param>
-        public DelegateCommand(Action<T> execute) : this(execute, null) { }
+        public DelegateCommand(Action<T> execute) 
+        {
+            _execute = execute??throw new ArgumentNullException(nameof(execute));
+        }
         /// <summary>
         /// 实例化委托命令
         /// </summary>

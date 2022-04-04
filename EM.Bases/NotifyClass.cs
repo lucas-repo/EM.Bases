@@ -33,7 +33,7 @@ namespace EM.Bases
             if (!Equals(t, value))
             {
                 t = value;
-                OnPropertyChanged(propertyName);
+                OnPropertyChanged(propertyName); 
                 return true;
             }
             return false;

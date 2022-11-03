@@ -93,13 +93,17 @@ namespace EM.SQLites
                 Connection.Close();
             }
         }
+        /// <summary>
+        /// 释放
+        /// </summary>
         public void Dispose()
         {
-            //if (Connection != null)
-            //{
-            //    Connection.Dispose();
-            //    Connection = null;
-            //}
+            if (Connection != null)
+            {
+                CloseConnection();
+                Connection.Dispose();
+                Connection = null;
+            }
         }
 
     }

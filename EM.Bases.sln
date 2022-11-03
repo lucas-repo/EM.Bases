@@ -5,7 +5,11 @@ VisualStudioVersion = 17.0.32112.339
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EM.Bases", "EM.Bases\EM.Bases.csproj", "{C2A0C59D-51EE-4F29-BC30-3091A1EBB783}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EM.WpfBases", "EM.WpfBases\EM.WpfBases.csproj", "{F3AFD094-9D34-4515-A270-4DE2FA63B85E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EM.WpfBases", "EM.WpfBases\EM.WpfBases.csproj", "{F3AFD094-9D34-4515-A270-4DE2FA63B85E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EM.SQLites", "EM.SQLites\EM.SQLites.csproj", "{C6BB8473-5EBA-4DB8-85F3-8BE14A667800}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EM.SpatiaLites", "EM.SpatiaLites\EM.SpatiaLites.csproj", "{D0A5B0F8-5282-424B-AD4B-A3DEC3017870}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{F3AFD094-9D34-4515-A270-4DE2FA63B85E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F3AFD094-9D34-4515-A270-4DE2FA63B85E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F3AFD094-9D34-4515-A270-4DE2FA63B85E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6BB8473-5EBA-4DB8-85F3-8BE14A667800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6BB8473-5EBA-4DB8-85F3-8BE14A667800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6BB8473-5EBA-4DB8-85F3-8BE14A667800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6BB8473-5EBA-4DB8-85F3-8BE14A667800}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0A5B0F8-5282-424B-AD4B-A3DEC3017870}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0A5B0F8-5282-424B-AD4B-A3DEC3017870}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0A5B0F8-5282-424B-AD4B-A3DEC3017870}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0A5B0F8-5282-424B-AD4B-A3DEC3017870}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

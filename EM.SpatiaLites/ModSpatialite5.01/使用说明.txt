@@ -1,0 +1,2 @@
+使用方式1：将ModSpatialite文件夹的文件拷至根目录
+使用方式2：设置机器环境变量Path，添加ModSpatialite的目录（需管理员权限）

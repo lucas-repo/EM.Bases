@@ -101,7 +101,7 @@ namespace EM.SQLites
             ret = sb.ToString();
             return ret;
         }
-       
+
         /// <summary>
         /// 获取表信息sql
         /// </summary>
@@ -134,7 +134,7 @@ namespace EM.SQLites
             }
             return ret;
         }
-        
+
         /// <summary>
         /// 获取个数sql
         /// </summary>
@@ -149,6 +149,47 @@ namespace EM.SQLites
             }
             ret = $"select COUNT(*) FROM {tableName};";
             return ret;
+        }
+        /// <summary>
+        /// 获取查询语句
+        /// </summary>
+        /// <param name="tableName">表名</param>
+        /// <param name="fields">字段集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>查询语句</returns>
+        public static string GetSelectSql(string tableName, IEnumerable<string> fields = null, string filter = null)
+        {
+            if (string.IsNullOrEmpty(tableName))
+            {
+                return string.Empty;
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.Append("SELECT ");
+            if (fields == null || fields.Count() == 0)
+            {
+                sb.Append("*");
+            }
+            else
+            {
+                for (int i = 0; i < fields.Count(); i++)
+                {
+                    if (i == 0)
+                    {
+                        sb.Append(fields.ElementAt(i));
+                    }
+                    else
+                    {
+                        sb.Append($",{fields.ElementAt(i)}");
+                    }
+                }
+            }
+            sb.Append($" FROM {tableName} ");
+            if (!string.IsNullOrEmpty(filter))
+            {
+                sb.Append($" WHERE {filter}");
+            }
+            sb.Append(";");
+            return sb.ToString();
         }
     }
 

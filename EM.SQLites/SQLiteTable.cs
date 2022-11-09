@@ -35,16 +35,7 @@ namespace EM.SQLites
             {
                 if (_propertyAndTableInfos == null)
                 {
-                    _propertyAndTableInfos = new Dictionary<PropertyInfo, TableInfo>();
-                    var type = typeof(T);
-                    var propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                    foreach (var propertyInfo in propertyInfos)
-                    {
-                        if (propertyInfo.GetCustomAttribute(typeof(FieldAttribute)) is FieldAttribute fieldAttribute)
-                        {
-                            _propertyAndTableInfos.Add(propertyInfo, fieldAttribute.TableInfo);
-                        }
-                    }
+                    _propertyAndTableInfos = GetPropertyAndTableInfos<T>();
                 }
                 return _propertyAndTableInfos;
             }
@@ -119,35 +110,40 @@ namespace EM.SQLites
             }
             return ret;
         }
+
         /// <summary>
         /// 从数据库中读取对象
         /// </summary>
-        /// <typeparam name="T">对象</typeparam>
         /// <param name="reader">数据行的可读流</param>
         /// <param name="successFields">成功的字段</param>
+        /// <param name="propertyAndTableInfos">属性与表字段信息字典</param>
         /// <returns>对象</returns>
-        protected T GetObject(DbDataReader reader, out List<string> successFields)
+        protected T1 GetObject<T1>(DbDataReader reader, out List<string> successFields, Dictionary<PropertyInfo, TableInfo> propertyAndTableInfos) where T1 : new()
         {
-            T t = default;
+            T1 t = default;
             successFields = new List<string>();
             if (reader == null)
             {
                 return t;
             }
-            t = new T();
+            t = new T1();
             for (int i = 0; i < reader.FieldCount; i++)
             {
                 var fieldName = reader.GetName(i);
-                foreach (var item in PropertyAndTableInfos)
+                var value = reader.GetValue(i);
+                if (propertyAndTableInfos != null)
                 {
-                    if (item.Value.Name == fieldName)
+                    foreach (var item in propertyAndTableInfos)
                     {
-                        var value = reader.GetValue(i);
-                        if (DbToProperty(value, t, item.Key))
+                        if (item.Value.Name == fieldName)
                         {
-                            successFields.Add(fieldName);
+                            if (DbToProperty(value, t, item.Key))
+                            {
+                                successFields.Add(fieldName);
+                                continue;
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
@@ -161,11 +157,25 @@ namespace EM.SQLites
         /// <returns>对象集合</returns>
         public async Task<List<T>> GetObjectsAsync(string sql, IEnumerable<DbParameter> parameters = null)
         {
-            List<T> ret = new List<T>();
+            List<T> ret = await GetObjectsAsync<T>(sql, parameters, PropertyAndTableInfos);
+            return ret;
+        }
+        /// <summary>
+        /// 从数据库读取对象集合
+        /// </summary>
+        /// <typeparam name="T1">类型</typeparam>
+        /// <param name="sql">sql语句</param>
+        /// <param name="parameters">参数</param>
+        /// <param name="propertyAndTableInfos">属性和表信息映射集合</param>
+        /// <returns>对象集合</returns>
+        protected async Task<List<T1>> GetObjectsAsync<T1>(string sql, IEnumerable<DbParameter> parameters = null, Dictionary<PropertyInfo, TableInfo> propertyAndTableInfos = null) where T1 : new()
+        {
+            List<T1> ret = new List<T1>();
             if (string.IsNullOrEmpty(sql) || Connection == null)
             {
                 return ret;
             }
+            Dictionary<PropertyInfo, TableInfo> destPropertyAndTableInfos = propertyAndTableInfos ?? GetPropertyAndTableInfos<T1>();
             await Connection.ExecuteAsync(async () =>
             {
                 using (var cmd = Connection.CreateCommand())
@@ -182,7 +192,7 @@ namespace EM.SQLites
                     {
                         while (await reader.ReadAsync())
                         {
-                            T t = GetObject(reader, out _);
+                            var t = GetObject<T1>(reader, out _, destPropertyAndTableInfos);
                             if (t != null)
                             {
                                 ret.Add(t);
@@ -251,10 +261,9 @@ namespace EM.SQLites
         }
 
         /// <summary>
-        /// 获取对象
+        /// 获取对象集合
         /// </summary>
-        /// <param name="index">索引</param>
-        /// <returns>对象</returns>
+        /// <returns>对象集合</returns>
         public async Task<List<T>> GetObjectsAsync()
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
@@ -413,7 +422,68 @@ namespace EM.SQLites
             }, true);
             return ret;
         }
-
+        /// <summary>
+        /// 插入对象
+        /// </summary>
+        /// <param name="fieldAndValuesList">字段和值集合</param>
+        /// <returns>成功个数</returns>
+        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo,object >> fieldAndValuesList)
+        {
+            int ret = 0;
+            if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
+            {
+                return ret;
+            }
+            await Connection.ExecuteAsync(async () =>
+            {
+                int count = 0;
+                foreach (var item in fieldAndValuesList)
+                {
+                    var sqlAndParas = GetInsertSql(Name, item);
+                    count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+                    ret += count;
+                }
+            }, true);
+            return ret;
+        }
+        /// <summary>
+        /// 插入对象
+        /// </summary>
+        /// <param name="fieldAndValues">字段和值集合</param>
+        /// <returns>成功与否</returns>
+        public virtual async Task<bool> InsertAsync(Dictionary<TableInfo, object> fieldAndValues)
+        {
+            bool ret = false;
+            if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValues?.Count() > 0))
+            {
+                return ret;
+            }
+            await Connection.ExecuteAsync(async () =>
+            {
+                var sqlAndParas = GetInsertSql(Name, fieldAndValues);
+                var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+            }, true);
+            return ret;
+        }
+        /// <summary>
+        /// 获取指定类型的属性与表信息映射集合
+        /// </summary>
+        /// <typeparam name="T1">指定类型</typeparam>
+        /// <returns>属性与表信息映射集合</returns>
+        public static Dictionary<PropertyInfo, TableInfo> GetPropertyAndTableInfos<T1>()
+        {
+            var ret = new Dictionary<PropertyInfo, TableInfo>();
+            var type = typeof(T1);
+            var propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var propertyInfo in propertyInfos)
+            {
+                if (propertyInfo.GetCustomAttribute(typeof(FieldAttribute)) is FieldAttribute fieldAttribute)
+                {
+                    ret.Add(propertyInfo, fieldAttribute.TableInfo);
+                }
+            }
+            return ret;
+        }
         /// <summary>
         /// 将对象转为列和值字典
         /// </summary>
@@ -454,7 +524,7 @@ namespace EM.SQLites
         /// <returns>查询语句和参数</returns>
         protected (string Sql, List<DbParameter> Parameters) GetUpdateSqlById(string tableName, Dictionary<TableInfo, object> dic, string id)
         {
-            if (string.IsNullOrEmpty(tableName) || !(dic?.Count > 0) )
+            if (string.IsNullOrEmpty(tableName) || !(dic?.Count > 0))
             {
                 return (null, new List<DbParameter>());
             }
@@ -564,6 +634,47 @@ namespace EM.SQLites
             return ret;
         }
         /// <summary>
+        /// 根据对象更新行
+        /// </summary>
+        /// <param name="fieldAndValues">对象</param>
+        /// <param name="id">id</param>
+        /// <returns>任务</returns>
+        public async Task<bool> UpdateAsync(Dictionary<TableInfo, object> fieldAndValues,string id)
+        {
+            bool ret = false;
+            if (Connection == null || string.IsNullOrEmpty(Name) ||fieldAndValues==null||fieldAndValues.Count==0||string.IsNullOrEmpty(id))
+            {
+                return ret;
+            }
+            var sqlAndParas = GetUpdateSql(Name, fieldAndValues, id);
+            var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+            ret = count == 1;
+            return ret;
+        }
+        /// <summary>
+        /// 更新多个对象
+        /// </summary>
+        /// <param name="fieldAndValuesList">对象集合</param>
+        /// <returns>成功个数</returns>
+        public async Task<int> UpdateAsync(IEnumerable<(string Id, Dictionary<TableInfo, object> FieldAndValues)> fieldAndValuesList)
+        {
+            int ret = 0;
+            if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
+            {
+                return ret;
+            }
+            await Connection.ExecuteAsync(async () =>
+            {
+                foreach (var item in fieldAndValuesList)
+                {
+                    var sqlAndParas = GetUpdateSql(Name, item.FieldAndValues, item.Id);
+                    var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+                    ret += count;
+                }
+            }, true);
+            return ret;
+        }
+        /// <summary>
         /// 删除指定行id的数据
         /// </summary>
         /// <param name="id">id</param>
@@ -615,6 +726,35 @@ namespace EM.SQLites
                     ret += count;
                 }
             }, true);
+            return ret;
+        }
+        /// <summary>
+        /// 获取表信息集合
+        /// </summary>
+        /// <returns>表信息集合</returns>
+        public async Task<List<TableInfo>> GetTableInfosAsync()
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<TableInfo>();
+            }
+            var sql = SQLiteQueries.GetTableInfoSql(Name);
+            var ret = await GetObjectsAsync<TableInfo>(sql);
+            return ret;
+        }
+        /// <summary>
+        /// 获取注记集合
+        /// </summary>
+        /// <param name="fields">字段集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>注记集合</returns>
+        public async Task<List<Dictionary<string, object>>> GetFieldAndValuesListAsync(IEnumerable<string> fields = null, string filter = null)
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<Dictionary<string, object>>();
+            }
+            var ret = await Connection.GetFieldAndValuesListAsync(Name, fields, filter);
             return ret;
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data.Common;
 using System.Data.SQLite;
 using System.Diagnostics;
@@ -427,7 +428,7 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="fieldAndValuesList">字段和值集合</param>
         /// <returns>成功个数</returns>
-        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo,object >> fieldAndValuesList)
+        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo, object>> fieldAndValuesList)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
@@ -639,10 +640,10 @@ namespace EM.SQLites
         /// <param name="fieldAndValues">对象</param>
         /// <param name="id">id</param>
         /// <returns>任务</returns>
-        public async Task<bool> UpdateAsync(Dictionary<TableInfo, object> fieldAndValues,string id)
+        public async Task<bool> UpdateAsync(Dictionary<TableInfo, object> fieldAndValues, string id)
         {
             bool ret = false;
-            if (Connection == null || string.IsNullOrEmpty(Name) ||fieldAndValues==null||fieldAndValues.Count==0||string.IsNullOrEmpty(id))
+            if (Connection == null || string.IsNullOrEmpty(Name) || fieldAndValues == null || fieldAndValues.Count == 0 || string.IsNullOrEmpty(id))
             {
                 return ret;
             }
@@ -755,6 +756,87 @@ namespace EM.SQLites
                 return new List<Dictionary<string, object>>();
             }
             var ret = await Connection.GetFieldAndValuesListAsync(Name, fields, filter);
+            return ret;
+        }
+        /// <summary>
+        /// 读取字段和值集合
+        /// </summary>
+        /// <param name="reader">数据读取器</param>
+        /// <param name="fieldInfos">字段集合</param>
+        /// <returns>字段和值集合</returns>
+        protected Dictionary<TableInfo, object> GetFieldAndValues(DbDataReader reader, IEnumerable<TableInfo> fieldInfos)
+        {
+            var ret = new Dictionary<TableInfo, object>();
+            if (reader == null || fieldInfos == null || fieldInfos.Count() == 0)
+            {
+                return ret;
+            }
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                var fieldName = reader.GetName(i);
+                var fieldInfo = fieldInfos.FirstOrDefault(x => x.Name == fieldName);
+                if (fieldInfo !=null&& !ret.ContainsKey(fieldInfo))
+                {
+                    var dbValue = reader.GetValue(i);
+                    var destValue = GetObjectFromDb(fieldInfo, dbValue);
+                    ret.Add(fieldInfo, destValue);
+                }
+            }
+            return ret;
+        }
+        /// <summary>
+        /// 从数据库读取指定字段的值
+        /// </summary>
+        /// <param name="fieldInfo">字段信息</param>
+        /// <param name="dbValue">数据库中的值</param>
+        /// <returns>值</returns>
+        protected virtual object GetObjectFromDb(TableInfo fieldInfo, object dbValue)
+        {
+            object ret = null;
+            if (!DBNull.Value.Equals(dbValue))
+            {
+                ret = dbValue;
+            }
+            return ret;
+        }
+        /// <summary>
+        /// 获取注记集合
+        /// </summary>
+        /// <param name="fieldInfos">字段集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>注记集合</returns>
+        public async Task<List<Dictionary<TableInfo, object>>> GetFieldAndValuesListAsync(IEnumerable<TableInfo> fieldInfos, string filter = null)
+        {
+            var ret = new List<Dictionary<TableInfo, object>>();
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return ret;
+            }
+            var fields = fieldInfos?.Select(x => x.Name);
+            var sql = GetSelectSql(Name, fieldInfos,filter:filter);
+            if (Connection == null || string.IsNullOrEmpty(sql))
+            {
+                return ret;
+            }
+            await Connection.ExecuteAsync(async () =>
+            {
+                using (var cmd = Connection.CreateCommand())
+                {
+                    cmd.CommandText = sql;
+                    using (var reader = await cmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var fieldAndValues = GetFieldAndValues(reader,fieldInfos);
+                            if (fieldAndValues != null)
+                            {
+                                ret.Add(fieldAndValues);
+                            }
+                        }
+                        reader.Close();
+                    }
+                }
+            });
             return ret;
         }
     }

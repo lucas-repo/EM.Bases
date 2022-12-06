@@ -539,7 +539,7 @@ namespace EM.SQLites
         /// <returns>过滤条件</returns>
         private string GetIdFilter(string id)
         {
-            string ret = null;
+            string ret;
             Type type = typeof(IdRecord);
             if (type.IsAssignableFrom(typeof(T)))
             {
@@ -571,6 +571,10 @@ namespace EM.SQLites
             {
                 var item = dic.ElementAt(i);
                 var columnInfo = item.Key;
+                if (columnInfo.PrimaryKey > 0)//跳过主键
+                {
+                    continue;
+                }
                 var value = item.Value;
                 sb.Append(i == 0 ? $"{columnInfo.Name} = " : $",{columnInfo.Name} = ");
                 var sqlAndPara = ColumnAndValueToSql(columnInfo, value);
@@ -594,30 +598,26 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="t">对象</param>
         /// <returns>任务</returns>
-        public async Task<bool> UpdateAsync(T t)
+        public async Task UpdateAsync(T t)
         {
-            bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(t is IdRecord idRecord))
             {
-                return ret;
+                return;
             }
             Dictionary<TableInfo, object> dic = GetTableInfoAndValues(t);
-            var sqlAndParas = GetUpdateSql(Name, dic, idRecord.ID);
-            var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
-            ret = count == 1;
-            return ret;
+            var sqlAndParas = GetUpdateSql(Name, dic, GetIdFilter(idRecord.ID));
+            await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
         }
         /// <summary>
         /// 更新多个对象
         /// </summary>
         /// <param name="ts">对象集合</param>
         /// <returns>成功个数</returns>
-        public async Task<int> UpdateAsync(IEnumerable<T> ts)
+        public async Task UpdateAsync(IEnumerable<T> ts)
         {
-            int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
             {
-                return ret;
+                return;
             }
             await Connection.ExecuteAsync(async () =>
             {
@@ -626,13 +626,11 @@ namespace EM.SQLites
                     if (t is IdRecord idRecord)
                     {
                         Dictionary<TableInfo, object> dic = GetTableInfoAndValues(t);
-                        var sqlAndParas = GetUpdateSql(Name, dic, idRecord.ID);
-                        var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
-                        ret += count;
+                        var sqlAndParas = GetUpdateSql(Name, dic, GetIdFilter(idRecord.ID));
+                        await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     }
                 }
             }, true);
-            return ret;
         }
         /// <summary>
         /// 根据对象更新行
@@ -647,7 +645,7 @@ namespace EM.SQLites
             {
                 return ret;
             }
-            var sqlAndParas = GetUpdateSql(Name, fieldAndValues, id);
+            var sqlAndParas = GetUpdateSql(Name, fieldAndValues, GetIdFilter(id));
             var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
             ret = count == 1;
             return ret;
@@ -668,7 +666,7 @@ namespace EM.SQLites
             {
                 foreach (var item in fieldAndValuesList)
                 {
-                    var sqlAndParas = GetUpdateSql(Name, item.FieldAndValues, item.Id);
+                    var sqlAndParas = GetUpdateSql(Name, item.FieldAndValues, GetIdFilter(item.Id));
                     var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     ret += count;
                 }
@@ -775,7 +773,7 @@ namespace EM.SQLites
             {
                 var fieldName = reader.GetName(i);
                 var fieldInfo = fieldInfos.FirstOrDefault(x => x.Name == fieldName);
-                if (fieldInfo !=null&& !ret.ContainsKey(fieldInfo))
+                if (fieldInfo != null && !ret.ContainsKey(fieldInfo))
                 {
                     var dbValue = reader.GetValue(i);
                     var destValue = GetObjectFromDb(fieldInfo, dbValue);
@@ -813,7 +811,7 @@ namespace EM.SQLites
                 return ret;
             }
             var fields = fieldInfos?.Select(x => x.Name);
-            var sql = GetSelectSql(Name, fieldInfos,filter:filter);
+            var sql = GetSelectSql(Name, fieldInfos, filter: filter);
             if (Connection == null || string.IsNullOrEmpty(sql))
             {
                 return ret;
@@ -827,7 +825,7 @@ namespace EM.SQLites
                     {
                         while (await reader.ReadAsync())
                         {
-                            var fieldAndValues = GetFieldAndValues(reader,fieldInfos);
+                            var fieldAndValues = GetFieldAndValues(reader, fieldInfos);
                             if (fieldAndValues != null)
                             {
                                 ret.Add(fieldAndValues);

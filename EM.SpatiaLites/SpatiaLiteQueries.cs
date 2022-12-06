@@ -57,7 +57,7 @@ namespace EM.SpatiaLites
                     sb.Append(",");
                 }
             }
-            var columns = tableInfos.Where(x => x.PrimatyKey > 0).OrderBy(x => x.PrimatyKey);
+            var columns = tableInfos.Where(x => x.PrimaryKey > 0).OrderBy(x => x.PrimaryKey);
             if (columns.Any())
             {
                 sb.Append("PRIMARY KEY (");

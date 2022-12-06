@@ -29,7 +29,7 @@ namespace EM.SQLites
                 Type = type,
                 DefaultValue = defaultValue,
                 Notnull = notNull,
-                PrimatyKey = primaryKey
+                PrimaryKey = primaryKey
             };
         }
     }

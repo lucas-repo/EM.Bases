@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Version>1.0.0-pre20221118-1</Version>
+    <Version>1.0.0-pre20221205-1</Version>
     <BaseOutputPath>..\bin</BaseOutputPath>
   </PropertyGroup>
 

@@ -41,6 +41,6 @@ namespace EM.SQLites
         /// 主键
         /// </summary>
         [Field("pk", FieldType.INTEGER)]
-        public int PrimatyKey { get; set; }
+        public int PrimaryKey { get; set; }
     }
 }

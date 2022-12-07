@@ -157,10 +157,20 @@ namespace EM.SQLites
                     {
                         foreach (var item in parameters)
                         {
-                            cmd.Parameters.Add(item);
+                            if (item != null)
+                            {
+                                cmd.Parameters.Add(item);
+                            }
                         }
                     }
-                    ret = await cmd.ExecuteNonQueryAsync();
+                    try
+                    {
+                        ret = await cmd.ExecuteNonQueryAsync();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"{nameof(ExecuteNonQueryAsync)}失败,{sql},{e}");
+                    }
                 }
             }, useTransaction);
             return ret;
@@ -192,7 +202,14 @@ namespace EM.SQLites
                             cmd.Parameters.Add(item);
                         }
                     }
-                    ret = await cmd.ExecuteScalarAsync();
+                    try
+                    {
+                        ret = await cmd.ExecuteScalarAsync();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"{nameof(ExecuteScalarAsync)}失败,{sql},{e}");
+                    }
                 }
             }, useTransaction);
             return ret;

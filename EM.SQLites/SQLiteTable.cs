@@ -633,12 +633,12 @@ namespace EM.SQLites
             }, true);
         }
         /// <summary>
-        /// 根据对象更新行
+        /// 更新指定的行
         /// </summary>
-        /// <param name="fieldAndValues">对象</param>
         /// <param name="id">id</param>
+        /// <param name="fieldAndValues">对象</param>
         /// <returns>任务</returns>
-        public async Task<bool> UpdateAsync(Dictionary<TableInfo, object> fieldAndValues, string id)
+        public async Task<bool> UpdateAsync(string id, Dictionary<TableInfo, object> fieldAndValues)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || fieldAndValues == null || fieldAndValues.Count == 0 || string.IsNullOrEmpty(id))
@@ -651,20 +651,35 @@ namespace EM.SQLites
             return ret;
         }
         /// <summary>
-        /// 更新多个对象
+        /// 更新指定的行
         /// </summary>
-        /// <param name="fieldAndValuesList">对象集合</param>
+        /// <param name="rowInfo">要更新的行</param>
+        /// <returns>任务</returns>
+        public async Task<bool> UpdateAsync(RowInfo rowInfo)
+        {
+            bool ret = false;
+            if (Connection == null || string.IsNullOrEmpty(Name) || rowInfo == null)
+            {
+                return ret;
+            }
+            ret =await UpdateAsync(rowInfo.Id, rowInfo.FieldAndValues);
+            return ret;
+        }
+        /// <summary>
+        /// 更新多个行
+        /// </summary>
+        /// <param name="rowInfos">行集合</param>
         /// <returns>成功个数</returns>
-        public async Task<int> UpdateAsync(IEnumerable<(string Id, Dictionary<TableInfo, object> FieldAndValues)> fieldAndValuesList)
+        public async Task<int> UpdateAsync(IEnumerable<RowInfo> rowInfos)
         {
             int ret = 0;
-            if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
+            if (Connection == null || string.IsNullOrEmpty(Name) || !(rowInfos?.Count() > 0))
             {
                 return ret;
             }
             await Connection.ExecuteAsync(async () =>
             {
-                foreach (var item in fieldAndValuesList)
+                foreach (var item in rowInfos)
                 {
                     var sqlAndParas = GetUpdateSql(Name, item.FieldAndValues, GetIdFilter(item.Id));
                     var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);

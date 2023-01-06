@@ -47,7 +47,7 @@ namespace EM.SpatiaLites
         {
             throw new Exception($"不允许直接删除记录");
         }
-        public override Task<int> DeleteAsync(IEnumerable<string> ids)
+        public override Task<int> DeleteAsync(IEnumerable<string> ids, bool useTransaction = true)
         {
             throw new Exception($"不允许直接删除记录");
         }

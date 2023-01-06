@@ -402,8 +402,9 @@ namespace EM.SQLites
         /// 插入对象
         /// </summary>
         /// <param name="ts">对象集合</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public virtual async Task<int> InsertAsync(IEnumerable<T> ts)
+        public virtual async Task<int> InsertAsync(IEnumerable<T> ts, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
@@ -420,15 +421,16 @@ namespace EM.SQLites
                     count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     ret += count;
                 }
-            }, true);
+            }, useTransaction);
             return ret;
         }
         /// <summary>
         /// 插入对象
         /// </summary>
         /// <param name="fieldAndValuesList">字段和值集合</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo, object>> fieldAndValuesList)
+        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo, object>> fieldAndValuesList, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
@@ -444,15 +446,16 @@ namespace EM.SQLites
                     count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     ret += count;
                 }
-            }, true);
+            }, useTransaction);
             return ret;
         }
         /// <summary>
         /// 插入对象
         /// </summary>
         /// <param name="fieldAndValues">字段和值集合</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>成功与否</returns>
-        public virtual async Task<bool> InsertAsync(Dictionary<TableInfo, object> fieldAndValues)
+        public virtual async Task<bool> InsertAsync(Dictionary<TableInfo, object> fieldAndValues, bool useTransaction = true)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValues?.Count() > 0))
@@ -463,7 +466,7 @@ namespace EM.SQLites
             {
                 var sqlAndParas = GetInsertSql(Name, fieldAndValues);
                 var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
-            }, true);
+            }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -612,8 +615,9 @@ namespace EM.SQLites
         /// 更新多个对象
         /// </summary>
         /// <param name="ts">对象集合</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public async Task UpdateAsync(IEnumerable<T> ts)
+        public async Task UpdateAsync(IEnumerable<T> ts, bool useTransaction = true)
         {
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
             {
@@ -630,7 +634,7 @@ namespace EM.SQLites
                         await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     }
                 }
-            }, true);
+            }, useTransaction);
         }
         /// <summary>
         /// 更新指定的行
@@ -669,8 +673,9 @@ namespace EM.SQLites
         /// 更新多个行
         /// </summary>
         /// <param name="rowInfos">行集合</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public async Task<int> UpdateAsync(IEnumerable<RowInfo> rowInfos)
+        public async Task<int> UpdateAsync(IEnumerable<RowInfo> rowInfos, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(rowInfos?.Count() > 0))
@@ -685,7 +690,7 @@ namespace EM.SQLites
                     var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
                     ret += count;
                 }
-            }, true);
+            }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -723,8 +728,9 @@ namespace EM.SQLites
         /// 删除多个指定行id的数据
         /// </summary>
         /// <param name="ids">行id集合（从1开始）</param>
+        /// <param name="useTransaction">使用事务</param>
         /// <returns>任务</returns>
-        public virtual async Task<int> DeleteAsync(IEnumerable<string> ids)
+        public virtual async Task<int> DeleteAsync(IEnumerable<string> ids, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ids?.Count() > 0))
@@ -739,7 +745,7 @@ namespace EM.SQLites
                     var count = await Connection.ExecuteNonQueryAsync(sql);
                     ret += count;
                 }
-            }, true);
+            }, useTransaction);
             return ret;
         }
         /// <summary>

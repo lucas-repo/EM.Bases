@@ -95,14 +95,14 @@ namespace EM.SpatiaLites
         /// <param name="xmax">最大x</param>
         /// <param name="ymax">最大y</param>
         /// <returns>对象集合</returns>
-        public async Task<List<T>> GetObjectsAsync(double xmin, double ymin, double xmax, double ymax)
+        public List<T> GetObjects(double xmin, double ymin, double xmax, double ymax)
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return new List<T>();
             }
             var sql = SpatiaLiteQueries.GetSelectByExtentSql(Name, xmin, ymin, xmax, ymax);
-            var ret = await GetObjectsAsync(sql);
+            var ret = GetObjects(sql);
             return ret;
         }
     }

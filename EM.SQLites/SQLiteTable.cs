@@ -57,7 +57,7 @@ namespace EM.SQLites
         /// <summary>
         /// 获取个数
         /// </summary>
-        public async Task<int> GetCountAsync()
+        public int GetCount()
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name))
@@ -65,7 +65,7 @@ namespace EM.SQLites
                 return ret;
             }
             string sql = SQLiteQueries.GetCountSql(Name);
-            if (await Connection.ExecuteScalarAsync(sql) is int count)
+            if (Connection.ExecuteScalar(sql) is int count)
             {
                 ret = count;
             }
@@ -76,13 +76,13 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="index">索引</param>
         /// <returns>对象</returns>
-        public async Task<T> GetObjectAsync(int index)
+        public T GetObject(int index)
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return default;
             }
-            List<T> values = await GetObjectsAsync(index, 1);
+            List<T> values = GetObjects(index, 1);
             T t = values.FirstOrDefault();
             return t;
         }
@@ -156,9 +156,9 @@ namespace EM.SQLites
         /// <param name="sql">sql语句</param>
         /// <param name="parameters">参数</param>
         /// <returns>对象集合</returns>
-        public async Task<List<T>> GetObjectsAsync(string sql, IEnumerable<DbParameter> parameters = null)
+        public List<T> GetObjects(string sql, IEnumerable<DbParameter> parameters = null)
         {
-            List<T> ret = await GetObjectsAsync<T>(sql, parameters, PropertyAndTableInfos);
+            List<T> ret = GetObjects<T>(sql, parameters, PropertyAndTableInfos);
             return ret;
         }
         /// <summary>
@@ -169,7 +169,7 @@ namespace EM.SQLites
         /// <param name="parameters">参数</param>
         /// <param name="propertyAndTableInfos">属性和表信息映射集合</param>
         /// <returns>对象集合</returns>
-        protected async Task<List<T1>> GetObjectsAsync<T1>(string sql, IEnumerable<DbParameter> parameters = null, Dictionary<PropertyInfo, TableInfo> propertyAndTableInfos = null) where T1 : new()
+        protected List<T1> GetObjects<T1>(string sql, IEnumerable<DbParameter> parameters = null, Dictionary<PropertyInfo, TableInfo> propertyAndTableInfos = null) where T1 : new()
         {
             List<T1> ret = new List<T1>();
             if (string.IsNullOrEmpty(sql) || Connection == null)
@@ -177,7 +177,7 @@ namespace EM.SQLites
                 return ret;
             }
             Dictionary<PropertyInfo, TableInfo> destPropertyAndTableInfos = propertyAndTableInfos ?? GetPropertyAndTableInfos<T1>();
-            await Connection.ExecuteAsync(async () =>
+            Connection.Execute(() =>
             {
                 using (var cmd = Connection.CreateCommand())
                 {
@@ -189,9 +189,9 @@ namespace EM.SQLites
                             cmd.Parameters.Add(item);
                         }
                     }
-                    using (var reader = await cmd.ExecuteReaderAsync())
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        while (await reader.ReadAsync())
+                        while (reader.Read())
                         {
                             var t = GetObject<T1>(reader, out _, destPropertyAndTableInfos);
                             if (t != null)
@@ -265,14 +265,14 @@ namespace EM.SQLites
         /// 获取对象集合
         /// </summary>
         /// <returns>对象集合</returns>
-        public async Task<List<T>> GetObjectsAsync()
+        public List<T> GetObjects()
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return new List<T>();
             }
             string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index: -1);
-            List<T> ret = await GetObjectsAsync(sql);
+            List<T> ret = GetObjects(sql);
             return ret;
         }
 
@@ -283,14 +283,14 @@ namespace EM.SQLites
         /// <param name="count">个数</param>
         /// <param name="filter">过滤条件</param>
         /// <returns>对象集合</returns>
-        public async Task<List<T>> GetObjectsAsync(int index = -1, int count = 1, string filter = null)
+        public List<T> GetObjects(int index = -1, int count = 1, string filter = null)
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return new List<T>();
             }
             string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index, count, filter);
-            List<T> ret = await GetObjectsAsync(sql);
+            List<T> ret = GetObjects(sql);
             return ret;
         }
 
@@ -385,7 +385,7 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="t">对象</param>
         /// <returns>成功true反之false</returns>
-        public virtual async Task<bool> InsertAsync(T t)
+        public virtual bool Insert(T t)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || t == null)
@@ -394,7 +394,7 @@ namespace EM.SQLites
             }
             Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(t);
             var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
-            var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+            var count = Connection.ExecuteNonQueryWithAutoOpen(sqlAndParas.Sql, sqlAndParas.Parameters);
             ret = count == 1;
             return ret;
         }
@@ -404,24 +404,24 @@ namespace EM.SQLites
         /// <param name="ts">对象集合</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public virtual async Task<int> InsertAsync(IEnumerable<T> ts, bool useTransaction = true)
+        public virtual int Insert(IEnumerable<T> ts, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
-            {
-                int count = 0;
-                foreach (var item in ts)
-                {
-                    Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(item);
-                    var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
-                    count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
-                    ret += count;
-                }
-            }, useTransaction);
+            Connection.Execute(() =>
+           {
+               int count = 0;
+               foreach (var item in ts)
+               {
+                   Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(item);
+                   var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
+                   count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
+                   ret += count;
+               }
+           }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -430,23 +430,23 @@ namespace EM.SQLites
         /// <param name="fieldAndValuesList">字段和值集合</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public virtual async Task<int> InsertAsync(List<Dictionary<TableInfo, object>> fieldAndValuesList, bool useTransaction = true)
+        public virtual int Insert(List<Dictionary<TableInfo, object>> fieldAndValuesList, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValuesList?.Count() > 0))
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
-            {
-                int count = 0;
-                foreach (var item in fieldAndValuesList)
-                {
-                    var sqlAndParas = GetInsertSql(Name, item);
-                    count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
-                    ret += count;
-                }
-            }, useTransaction);
+            Connection.Execute(() =>
+           {
+               int count = 0;
+               foreach (var item in fieldAndValuesList)
+               {
+                   var sqlAndParas = GetInsertSql(Name, item);
+                   count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
+                   ret += count;
+               }
+           }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -455,17 +455,17 @@ namespace EM.SQLites
         /// <param name="fieldAndValues">字段和值集合</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>成功与否</returns>
-        public virtual async Task<bool> InsertAsync(Dictionary<TableInfo, object> fieldAndValues, bool useTransaction = true)
+        public virtual bool Insert(Dictionary<TableInfo, object> fieldAndValues, bool useTransaction = true)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(fieldAndValues?.Count() > 0))
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
+            Connection.Execute(() =>
             {
                 var sqlAndParas = GetInsertSql(Name, fieldAndValues);
-                var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+                var count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
             }, useTransaction);
             return ret;
         }
@@ -600,8 +600,7 @@ namespace EM.SQLites
         /// 根据对象更新行
         /// </summary>
         /// <param name="t">对象</param>
-        /// <returns>任务</returns>
-        public async Task UpdateAsync(T t)
+        public void Update(T t)
         {
             if (Connection == null || string.IsNullOrEmpty(Name) || !(t is IdRecord idRecord))
             {
@@ -609,21 +608,20 @@ namespace EM.SQLites
             }
             Dictionary<TableInfo, object> dic = GetTableInfoAndValues(t);
             var sqlAndParas = GetUpdateSql(Name, dic, GetIdFilter(idRecord.ID));
-            await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+            Connection.ExecuteNonQueryWithAutoOpen(sqlAndParas.Sql, sqlAndParas.Parameters);
         }
         /// <summary>
         /// 更新多个对象
         /// </summary>
         /// <param name="ts">对象集合</param>
         /// <param name="useTransaction">使用事务</param>
-        /// <returns>成功个数</returns>
-        public async Task UpdateAsync(IEnumerable<T> ts, bool useTransaction = true)
+        public void Update(IEnumerable<T> ts, bool useTransaction = true)
         {
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
             {
                 return;
             }
-            await Connection.ExecuteAsync(async () =>
+            Connection.Execute(() =>
             {
                 foreach (var t in ts)
                 {
@@ -631,7 +629,7 @@ namespace EM.SQLites
                     {
                         Dictionary<TableInfo, object> dic = GetTableInfoAndValues(t);
                         var sqlAndParas = GetUpdateSql(Name, dic, GetIdFilter(idRecord.ID));
-                        await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+                        Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
                     }
                 }
             }, useTransaction);
@@ -641,8 +639,8 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="id">id</param>
         /// <param name="fieldAndValues">对象</param>
-        /// <returns>任务</returns>
-        public async Task<bool> UpdateAsync(string id, Dictionary<TableInfo, object> fieldAndValues)
+        /// <returns>成功与否</returns>
+        public bool Update(string id, Dictionary<TableInfo, object> fieldAndValues)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || fieldAndValues == null || fieldAndValues.Count == 0 || string.IsNullOrEmpty(id))
@@ -650,7 +648,7 @@ namespace EM.SQLites
                 return ret;
             }
             var sqlAndParas = GetUpdateSql(Name, fieldAndValues, GetIdFilter(id));
-            var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+            var count = Connection.ExecuteNonQueryWithAutoOpen(sqlAndParas.Sql, sqlAndParas.Parameters);
             ret = count == 1;
             return ret;
         }
@@ -658,15 +656,15 @@ namespace EM.SQLites
         /// 更新指定的行
         /// </summary>
         /// <param name="rowInfo">要更新的行</param>
-        /// <returns>任务</returns>
-        public async Task<bool> UpdateAsync(RowInfo rowInfo)
+        /// <returns>成功与否</returns>
+        public bool Update(RowInfo rowInfo)
         {
             bool ret = false;
             if (Connection == null || string.IsNullOrEmpty(Name) || rowInfo == null)
             {
                 return ret;
             }
-            ret =await UpdateAsync(rowInfo.Id, rowInfo.FieldAndValues);
+            ret = Update(rowInfo.Id, rowInfo.FieldAndValues);
             return ret;
         }
         /// <summary>
@@ -675,19 +673,19 @@ namespace EM.SQLites
         /// <param name="rowInfos">行集合</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
-        public async Task<int> UpdateAsync(IEnumerable<RowInfo> rowInfos, bool useTransaction = true)
+        public int Update(IEnumerable<RowInfo> rowInfos, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(rowInfos?.Count() > 0))
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
+            Connection.Execute(() =>
             {
                 foreach (var item in rowInfos)
                 {
                     var sqlAndParas = GetUpdateSql(Name, item.FieldAndValues, GetIdFilter(item.Id));
-                    var count = await Connection.ExecuteNonQueryAsync(sqlAndParas.Sql, sqlAndParas.Parameters);
+                    var count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
                     ret += count;
                 }
             }, useTransaction);
@@ -698,14 +696,14 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="id">id</param>
         /// <returns>任务</returns>
-        public virtual async Task DeleteAsync(string id)
+        public virtual void Delete(string id)
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return;
             }
             var sql = GetDeleteSql(Name, id);
-            await Connection.ExecuteNonQueryAsync(sql);
+            Connection.ExecuteNonQueryWithAutoOpen(sql);
         }
 
         /// <summary>
@@ -729,37 +727,37 @@ namespace EM.SQLites
         /// </summary>
         /// <param name="ids">行id集合（从1开始）</param>
         /// <param name="useTransaction">使用事务</param>
-        /// <returns>任务</returns>
-        public virtual async Task<int> DeleteAsync(IEnumerable<string> ids, bool useTransaction = true)
+        /// <returns>成功个数</returns>
+        public virtual int Delete(IEnumerable<string> ids, bool useTransaction = true)
         {
             int ret = 0;
             if (Connection == null || string.IsNullOrEmpty(Name) || !(ids?.Count() > 0))
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
-            {
-                foreach (var id in ids)
-                {
-                    var sql = GetDeleteSql(Name, id);
-                    var count = await Connection.ExecuteNonQueryAsync(sql);
-                    ret += count;
-                }
-            }, useTransaction);
+            Connection.Execute(() =>
+           {
+               foreach (var id in ids)
+               {
+                   var sql = GetDeleteSql(Name, id);
+                   var count = Connection.ExecuteNonQuery(sql);
+                   ret += count;
+               }
+           }, useTransaction);
             return ret;
         }
         /// <summary>
         /// 获取表信息集合
         /// </summary>
         /// <returns>表信息集合</returns>
-        public async Task<List<TableInfo>> GetTableInfosAsync()
+        public List<TableInfo> GetTableInfos()
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return new List<TableInfo>();
             }
             var sql = SQLiteQueries.GetTableInfoSql(Name);
-            var ret = await GetObjectsAsync<TableInfo>(sql);
+            var ret = GetObjects<TableInfo>(sql);
             return ret;
         }
         /// <summary>
@@ -768,13 +766,13 @@ namespace EM.SQLites
         /// <param name="fields">字段集合</param>
         /// <param name="filter">过滤条件</param>
         /// <returns>注记集合</returns>
-        public async Task<List<Dictionary<string, object>>> GetFieldAndValuesListAsync(IEnumerable<string> fields = null, string filter = null)
+        public List<Dictionary<string, object>> GetFieldAndValuesList(IEnumerable<string> fields = null, string filter = null)
         {
             if (Connection == null || string.IsNullOrEmpty(Name))
             {
                 return new List<Dictionary<string, object>>();
             }
-            var ret = await Connection.GetFieldAndValuesListAsync(Name, fields, filter);
+            var ret = Connection.GetFieldAndValuesList(Name, fields, filter);
             return ret;
         }
         /// <summary>
@@ -824,7 +822,7 @@ namespace EM.SQLites
         /// <param name="fieldInfos">字段集合</param>
         /// <param name="filter">过滤条件</param>
         /// <returns>注记集合</returns>
-        public async Task<List<Dictionary<TableInfo, object>>> GetFieldAndValuesListAsync(IEnumerable<TableInfo> fieldInfos, string filter = null)
+        public List<Dictionary<TableInfo, object>> GetFieldAndValuesList(IEnumerable<TableInfo> fieldInfos, string filter = null)
         {
             var ret = new List<Dictionary<TableInfo, object>>();
             if (Connection == null || string.IsNullOrEmpty(Name))
@@ -837,14 +835,14 @@ namespace EM.SQLites
             {
                 return ret;
             }
-            await Connection.ExecuteAsync(async () =>
+            Connection.Execute(() =>
             {
                 using (var cmd = Connection.CreateCommand())
                 {
                     cmd.CommandText = sql;
-                    using (var reader = await cmd.ExecuteReaderAsync())
+                    using (var reader = cmd.ExecuteReader())
                     {
-                        while (await reader.ReadAsync())
+                        while (reader.Read())
                         {
                             var fieldAndValues = GetFieldAndValues(reader, fieldInfos);
                             if (fieldAndValues != null)

@@ -1,5 +1,6 @@
 ﻿using EM.Bases;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Diagnostics;
@@ -26,129 +27,66 @@ namespace EM.SQLites
             {
                 return;
             }
-            bool needClose = false;
-            if (connection.State != System.Data.ConnectionState.Open)
+            if (!LockContainer.TryGetValue(connection, out object lockObj))
             {
-                connection.Open();
-                needClose = true;
+                lockObj = new object();
+                LockContainer.TryAdd(connection, lockObj);
             }
-            DbTransaction transaction = null;
-            if (useTransaction)
+            lock (lockObj)
             {
-                transaction = connection.BeginTransaction();
-            }
-
-            action.Invoke();//执行sql查询方法
-
-            if (transaction != null)
-            {
-                transaction.Commit();
-                transaction.Dispose();
-            }
-            if (needClose)
-            {
-                connection.Close();
-            }
-        }
-        /// <summary>
-        /// 执行sql方法（自动打开数据库链接）
-        /// </summary>
-        /// <param name="connection">数据库链接</param>
-        /// <param name="func">要执行的sql查询方法</param>
-        /// <param name="useTransaction">使用事务</param>
-        /// <returns>任务</returns>
-        public static async Task ExecuteAsync(this DbConnection connection, Func<Task> func, bool useTransaction = false)
-        {
-            if (connection == null || func == null)
-            {
-                return;
-            }
-            bool needClose = false;
-            if (connection.State != System.Data.ConnectionState.Open)
-            {
-                await connection.OpenAsync();
-                needClose = true;
-            }
-            DbTransaction transaction = null;
-            if (useTransaction)
-            {
-                transaction = connection.BeginTransaction();
-            }
-            try
-            {
-                await func.Invoke();//执行sql查询方法
-                if (transaction != null)
+                try
                 {
-                    transaction.Commit();
+                    bool needClose = false;
+                    if (connection.State != System.Data.ConnectionState.Open)
+                    {
+                        connection.Open();
+                        needClose = true;
+                    }
+                    DbTransaction transaction = null;
+                    if (useTransaction)
+                    {
+                        transaction = connection.BeginTransaction();
+                    }
+
+                    action.Invoke();//执行sql查询方法
+
+                    if (transaction != null)
+                    {
+                        transaction.Commit();
+                        transaction.Dispose();
+                    }
+                    if (needClose)
+                    {
+                        connection.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"执行{nameof(Execute)}失败，{ex}");
                 }
             }
-            catch (Exception e)
-            {
-                Debug.WriteLine($"{nameof(ExecuteAsync)}失败，{e}");
-            }
-
-            if (transaction != null)
-            {
-                transaction.Dispose();
-            }
-            if (needClose)
-            {
-                connection.Close();
-            }
         }
         /// <summary>
-        /// 执行sql方法（自动打开数据库链接）
+        /// 数据库连接锁容器
         /// </summary>
-        /// <param name="connection">数据库链接</param>
-        /// <param name="action">要执行的sql查询方法</param>
-        /// <param name="useTransaction">使用事务</param>
-        /// <returns>任务</returns>
-        public static async Task ExecuteAsync(this DbConnection connection, Action action, bool useTransaction = false)
-        {
-            if (connection == null || action == null)
-            {
-                return;
-            }
-            bool needClose = false;
-            if (connection.State != System.Data.ConnectionState.Open)
-            {
-                await connection.OpenAsync();
-                needClose = true;
-            }
-            DbTransaction transaction = null;
-            if (useTransaction)
-            {
-                transaction = connection.BeginTransaction();
-            }
+        private static ConcurrentDictionary<DbConnection, object> LockContainer { get; } = new ConcurrentDictionary<DbConnection, object>();
 
-            action.Invoke();//执行sql查询方法
-
-            if (transaction != null)
-            {
-                transaction.Commit();
-                transaction.Dispose();
-            }
-            if (needClose)
-            {
-                connection.Close();
-            }
-        }
         /// <summary>
-        /// 执行查询
+        /// 执行查询(自动打开)
         /// </summary>
         /// <param name="connection">数据库连接</param>
         /// <param name="sql">sql语句</param>
         /// <param name="parameters">参数</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>受影响的行</returns>
-        public static async Task<int> ExecuteNonQueryAsync(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null, bool useTransaction = false)
+        public static int ExecuteNonQueryWithAutoOpen(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null, bool useTransaction = false)
         {
             int ret = 0;
-            if (string.IsNullOrEmpty(sql) || connection == null)
+            if (connection == null || string.IsNullOrEmpty(sql))
             {
                 return ret;
             }
-            await connection.ExecuteAsync(async () =>
+            connection.Execute(() =>
             {
                 using (var cmd = connection.CreateCommand())
                 {
@@ -165,14 +103,52 @@ namespace EM.SQLites
                     }
                     try
                     {
-                        ret = await cmd.ExecuteNonQueryAsync();
+                        ret = cmd.ExecuteNonQuery();
                     }
                     catch (Exception e)
                     {
-                        Debug.WriteLine($"{nameof(ExecuteNonQueryAsync)}失败,{sql},{e}");
+                        Debug.WriteLine($"{nameof(ExecuteNonQueryWithAutoOpen)}失败,{sql},{e}");
                     }
                 }
             }, useTransaction);
+            return ret;
+        }
+        /// <summary>
+        /// 执行查询(自动打开)
+        /// </summary>
+        /// <param name="connection">数据库连接</param>
+        /// <param name="sql">sql语句</param>
+        /// <param name="parameters">参数</param>
+        /// <returns>受影响的行</returns>
+        public static int ExecuteNonQuery(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null)
+        {
+            int ret = 0;
+            if (connection == null || string.IsNullOrEmpty(sql))
+            {
+                return ret;
+            }
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = sql;
+                if (parameters?.Count() > 0)
+                {
+                    foreach (var item in parameters)
+                    {
+                        if (item != null)
+                        {
+                            cmd.Parameters.Add(item);
+                        }
+                    }
+                }
+                try
+                {
+                    ret = cmd.ExecuteNonQuery();
+                }
+                catch (Exception e)
+                {
+                    Debug.WriteLine($"{nameof(ExecuteNonQueryWithAutoOpen)}失败,{sql},{e}");
+                }
+            }
             return ret;
         }
         /// <summary>
@@ -183,35 +159,35 @@ namespace EM.SQLites
         /// <param name="parameters">参数</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>结果的第一行第一列</returns>
-        public static async Task<object> ExecuteScalarAsync(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null, bool useTransaction = false)
+        public static object ExecuteScalar(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null, bool useTransaction = false)
         {
             object ret = null;
             if (string.IsNullOrEmpty(sql) || connection == null)
             {
                 return ret;
             }
-            await connection.ExecuteAsync(async () =>
-            {
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = sql;
-                    if (parameters?.Count() > 0)
-                    {
-                        foreach (var item in parameters)
-                        {
-                            cmd.Parameters.Add(item);
-                        }
-                    }
-                    try
-                    {
-                        ret = await cmd.ExecuteScalarAsync();
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.WriteLine($"{nameof(ExecuteScalarAsync)}失败,{sql},{e}");
-                    }
-                }
-            }, useTransaction);
+            connection.Execute(() =>
+           {
+               using (var cmd = connection.CreateCommand())
+               {
+                   cmd.CommandText = sql;
+                   if (parameters?.Count() > 0)
+                   {
+                       foreach (var item in parameters)
+                       {
+                           cmd.Parameters.Add(item);
+                       }
+                   }
+                   try
+                   {
+                       ret = cmd.ExecuteScalar();
+                   }
+                   catch (Exception e)
+                   {
+                       Debug.WriteLine($"{nameof(ExecuteScalar)}失败,{sql},{e}");
+                   }
+               }
+           }, useTransaction);
             return ret;
         }
 
@@ -365,14 +341,14 @@ namespace EM.SQLites
         /// <param name="fields">字段集合</param>
         /// <param name="filter">过滤条件</param>
         /// <returns>数据</returns>
-        public static async Task<List<Dictionary<string, object>>> GetFieldAndValuesListAsync(this DbConnection connection, string tableName, IEnumerable<string> fields = null, string filter = null)
+        public static List<Dictionary<string, object>> GetFieldAndValuesList(this DbConnection connection, string tableName, IEnumerable<string> fields = null, string filter = null)
         {
             if (connection == null || string.IsNullOrEmpty(tableName))
             {
                 return new List<Dictionary<string, object>>();
             }
             var sql = SQLiteQueries.GetSelectSql(tableName, fields, filter);
-            var ret = await connection.GetFieldAndValuesListBySqlAsync(sql);
+            var ret = connection.GetFieldAndValuesListBySql(sql);
             return ret;
         }
         /// <summary>
@@ -382,39 +358,39 @@ namespace EM.SQLites
         /// <param name="sql">sql语句</param>
         /// <param name="parameters">参数</param>
         /// <returns>数据集合</returns>
-        public static async Task<List<Dictionary<string, object>>> GetFieldAndValuesListBySqlAsync(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null)
+        public static List<Dictionary<string, object>> GetFieldAndValuesListBySql(this DbConnection connection, string sql, IEnumerable<DbParameter> parameters = null)
         {
             var ret = new List<Dictionary<string, object>>();
             if (connection == null || string.IsNullOrEmpty(sql))
             {
                 return ret;
             }
-            await connection.ExecuteAsync(async () =>
-            {
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = sql;
-                    if (parameters?.Count() > 0)
-                    {
-                        foreach (var item in parameters)
-                        {
-                            cmd.Parameters.Add(item);
-                        }
-                    }
-                    using (var reader = await cmd.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            var t = GetFieldAndValues(reader);
-                            if (t != null)
-                            {
-                                ret.Add(t);
-                            }
-                        }
-                        reader.Close();
-                    }
-                }
-            });
+            connection.Execute(() =>
+           {
+               using (var cmd = connection.CreateCommand())
+               {
+                   cmd.CommandText = sql;
+                   if (parameters?.Count() > 0)
+                   {
+                       foreach (var item in parameters)
+                       {
+                           cmd.Parameters.Add(item);
+                       }
+                   }
+                   using (var reader = cmd.ExecuteReader())
+                   {
+                       while (reader.Read())
+                       {
+                           var t = GetFieldAndValues(reader);
+                           if (t != null)
+                           {
+                               ret.Add(t);
+                           }
+                       }
+                       reader.Close();
+                   }
+               }
+           });
             return ret;
         }
         /// <summary>
@@ -444,7 +420,7 @@ namespace EM.SQLites
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     var fieldName = reader.GetName(i);
-                    if (fields.Contains(fieldName)&&!ret.ContainsKey(fieldName))
+                    if (fields.Contains(fieldName) && !ret.ContainsKey(fieldName))
                     {
                         var value = reader.GetValue(i);
                         ret.Add(fieldName, value);

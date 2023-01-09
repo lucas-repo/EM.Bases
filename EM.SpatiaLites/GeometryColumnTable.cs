@@ -26,7 +26,7 @@ namespace EM.SpatiaLites
         /// <param name="annotationTableName">表名</param>
         /// <param name="geometryColumn">几何列</param>
         /// <returns>几何列记录</returns>
-        public async Task<GeometryColumnRecord> GetObjectAsync(string annotationTableName, string geometryColumn = GeometryColumn)
+        public GeometryColumnRecord GetObject(string annotationTableName, string geometryColumn = GeometryColumn)
         {
             GeometryColumnRecord ret = null;
             if (string.IsNullOrEmpty(annotationTableName) || string.IsNullOrEmpty(geometryColumn))
@@ -35,19 +35,19 @@ namespace EM.SpatiaLites
             }
             string filter = $"f_table_name='{annotationTableName}' AND f_geometry_column='{geometryColumn}'";
             string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index: -1, filter: filter);
-            var geometryColumns = await GetObjectsAsync(sql);
+            var geometryColumns =  GetObjects(sql);
             ret = geometryColumns.FirstOrDefault();
             return ret;
         }
-        public override async Task<bool> InsertAsync(GeometryColumnRecord t)
+        public override bool Insert(GeometryColumnRecord t)
         {
             throw new Exception($"请使用{nameof(SpatiaLiteContext.CreateSpatialTable)}方法添加空间表");
         }
-        public override Task DeleteAsync(string id)
+        public override void Delete(string id)
         {
             throw new Exception($"不允许直接删除记录");
         }
-        public override Task<int> DeleteAsync(IEnumerable<string> ids, bool useTransaction = true)
+        public override int Delete(IEnumerable<string> ids, bool useTransaction = true)
         {
             throw new Exception($"不允许直接删除记录");
         }

@@ -10,7 +10,7 @@ namespace EM.SQLites
     /// <summary>
     /// SQLite数据库上下文
     /// </summary>
-    public abstract class SQLiteContext:IDisposable
+    public abstract class SQLiteContext : IDisposable
     {
         /// <summary>
         /// 数据库连接
@@ -21,7 +21,7 @@ namespace EM.SQLites
         /// </summary>
         public ConnectionState ConnectionState
         {
-            get 
+            get
             {
                 ConnectionState state = ConnectionState.Closed;
                 if (Connection != null)
@@ -61,26 +61,26 @@ namespace EM.SQLites
         /// <summary>
         /// 执行sql方法（自动打开数据库链接）
         /// </summary>
-        /// <param name="func">要执行的sql查询方法</param>
+        /// <param name="action">要执行的sql查询方法</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>任务</returns>
-        public async Task ExecuteAsync( Func<Task> func, bool useTransaction = false)
+        public void Execute(Action action, bool useTransaction = false)
         {
-            if (Connection == null || func == null)
+            if (Connection == null || action == null)
             {
                 return;
             }
-            await Connection.ExecuteAsync(func, useTransaction);
+            Connection.Execute(action, useTransaction);
         }
         /// <summary>
         /// 打开数据库连接
         /// </summary>
         /// <returns></returns>
-        public virtual async Task OpenConnection()
+        public virtual void OpenConnection()
         {
-            if (Connection != null&& Connection.State!= ConnectionState.Open)
+            if (Connection != null && Connection.State != ConnectionState.Open)
             {
-                await Connection.OpenAsync();
+                 Connection.Open();
             }
         }
         /// <summary>

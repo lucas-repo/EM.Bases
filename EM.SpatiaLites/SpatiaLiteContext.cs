@@ -30,7 +30,7 @@ namespace EM.SpatiaLites
         /// <returns>成功true反之false</returns>
         public static bool CreateSpatialDatabase(string filename)
         {
-            var ret = typeof(SpatiaLiteContext).Assembly.CopyEmbeddedResourceToFile("annotation.db",filename);
+            var ret = typeof(SpatiaLiteContext).Assembly.CopyEmbeddedResourceToFile("annotation.db", filename);
             return ret;
         }
         /// <summary>
@@ -39,8 +39,7 @@ namespace EM.SpatiaLites
         /// <param name="tableName">表名</param>
         /// <param name="columnInfos">列信息集合</param>
         /// <param name="geometryColumn">几何列</param>
-        /// <returns>任务</returns>
-        public async Task CreateSpatialTable(string tableName, IEnumerable<TableInfo> columnInfos, GeometryColumnRecord geometryColumn)
+        public void CreateSpatialTable(string tableName, IEnumerable<TableInfo> columnInfos, GeometryColumnRecord geometryColumn)
         {
             if (Connection == null || string.IsNullOrEmpty(tableName) || !(columnInfos?.Count() > 0) || geometryColumn == null)
             {
@@ -62,14 +61,14 @@ namespace EM.SpatiaLites
                 return;
             }
             var sql = $"{createTableSql}{addGeometryColumnSql}{createSpatialIndexSql}";
-            var ret = await Connection.ExecuteNonQueryAsync(sql, useTransaction: true);
+            var ret = Connection.ExecuteNonQueryWithAutoOpen(sql, useTransaction: true);
         }
-        public override async Task OpenConnection()
+        public override void OpenConnection()
         {
-            await base.OpenConnection();//打开数据库连接
+            base.OpenConnection();//打开数据库连接
             if (Connection != null)
             {
-                await Connection.LoadModeSpatialite();//打开数据库连接后必须加载空间扩展
+                Connection.LoadModeSpatialite();//打开数据库连接后必须加载空间扩展
             }
         }
     }

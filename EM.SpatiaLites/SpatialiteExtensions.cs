@@ -17,15 +17,14 @@ namespace EM.SpatiaLites
         /// 添加空间扩展
         /// </summary>
         /// <param name="connection">数据库连接</param>
-        /// <returns>任务</returns>
         /// <exception cref="Exception">加载扩展异常</exception>
-        public static async Task LoadModeSpatialite(this SQLiteConnection connection)
+        public static void LoadModeSpatialite(this SQLiteConnection connection)
         {
             if (connection == null)
             {
                 return;
             }
-           await  connection.ExecuteAsync( () =>
+            connection.Execute( () =>
            {
                try
                {

@@ -10,7 +10,14 @@ namespace EM.Bases
     /// 可通知的集合
     /// </summary>
     /// <typeparam name="T">泛型</typeparam>
-    public interface IItemCollection<T> : IEnumerable<T>, INotifyCollectionChanged, INotifyPropertyChanged
+    public interface IItemCollection<T> : IList<T>, INotifyCollectionChanged, INotifyPropertyChanged
+    {
+
+    }
+    /// <summary>
+    /// 可通知的集合
+    /// </summary>
+    public interface IItemCollection : IItemCollection<IBaseItem>
     {
 
     }

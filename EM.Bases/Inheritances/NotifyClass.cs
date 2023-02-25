@@ -16,7 +16,7 @@ namespace EM.Bases
     public abstract class NotifyClass : INotifyPropertyChanged
     {
         /// <summary>
-        /// 属性改变事件
+        /// 属性改变后的事件
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -33,14 +33,14 @@ namespace EM.Bases
             if (!Equals(t, value))
             {
                 t = value;
-                OnPropertyChanged(propertyName); 
+                OnPropertyChanged(propertyName);
                 return true;
             }
             return false;
         }
 
         /// <summary>
-        /// 属性更改方法
+        /// 触发属性改变后事件的方法
         /// </summary>
         /// <param name="propertyName">属性名</param>
         protected virtual void OnPropertyChanged(string propertyName)

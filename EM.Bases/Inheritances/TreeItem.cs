@@ -8,49 +8,43 @@ using System.Threading.Tasks;
 namespace EM.Bases
 {
     /// <summary>
-    /// 泛型树节点
+    /// 泛型树元素
     /// </summary>
-    public class TreeItem<T> : SelectableItem<T>, ITreeItem<T>
+    public class TreeItem: GroupItem, ITreeItem
     {
-        private ITreeItem<T> _parent;
-        /// <summary>
-        /// 父节点
-        /// </summary>
-        public virtual ITreeItem<T> Parent
+        private ITreeItem _parent;
+        /// <inheritdoc/>
+        public virtual ITreeItem Parent
         {
             get { return _parent; }
             set { SetProperty(ref _parent, value); }
         }
 
-        /// <summary>
-        /// 子节点集合
-        /// </summary>
-        public IItemCollection<ITreeItem<T>> Children { get; } = new ItemCollection<ITreeItem<T>>() { };
-        /// <summary>
-        /// 级别
-        /// </summary>
+        /// <inheritdoc/>
         public virtual int Level
         {
             get
             {
                 int level = 0;
                 var parent = Parent;
-                while (parent!=null)
+                while (parent != null)
                 {
                     level++;
-                    parent=parent.Parent;
+                    parent = parent.Parent; 
                 }
                 return level;
             }
         }
 
         private bool _isVisible;
+        /// <inheritdoc/>
         public virtual bool IsVisible
         {
             get { return _isVisible; }
             set { SetProperty(ref _isVisible, value); }
         }
         private bool _isExpanded = true;
+        /// <inheritdoc/>
         public virtual bool IsExpanded
         {
             get { return _isExpanded; }

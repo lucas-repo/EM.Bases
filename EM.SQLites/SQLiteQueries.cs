@@ -139,15 +139,23 @@ namespace EM.SQLites
         /// 获取个数sql
         /// </summary>
         /// <param name="tableName">表名</param>
+        /// <param name="field">字段</param>
         /// <returns>sql</returns>
-        public static string GetCountSql(string tableName)
+        public static string GetCountSql(string tableName,string field="")
         {
             string ret = null;
             if (string.IsNullOrEmpty(tableName))
             {
                 return ret;
             }
-            ret = $"select COUNT(*) FROM {tableName};";
+            if (string.IsNullOrEmpty(field))
+            {
+                ret = $"select COUNT(*) FROM {tableName};";
+            }
+            else
+            {
+                ret = $"select COUNT({field}) FROM {tableName};";
+            }
             return ret;
         }
         /// <summary>

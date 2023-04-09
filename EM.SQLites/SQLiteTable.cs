@@ -14,8 +14,7 @@ namespace EM.SQLites
     /// <summary>
     /// 表
     /// </summary>
-    /// <typeparam name="T">类或字典。为类时，将带<seealso cref="FieldAttribute"/>特性的公开属性写到数据库/></typeparam>
-    public class SQLiteTable<T> where T : Record, new()
+    public abstract class SQLiteTable
     {
         /// <summary>
         /// 数据库
@@ -26,21 +25,10 @@ namespace EM.SQLites
         /// </summary>
         public string Name { get; set; }
 
-        private Dictionary<PropertyInfo, TableInfo> _propertyAndTableInfos;
         /// <summary>
-        /// 类型<seealso cref="T"/>中带<seealso cref="FieldAttribute"/>特性的属性信息和字段信息集合
+        /// 带<seealso cref="FieldAttribute"/>特性的属性信息和字段信息集合
         /// </summary>
-        protected Dictionary<PropertyInfo, TableInfo> PropertyAndTableInfos
-        {
-            get
-            {
-                if (_propertyAndTableInfos == null)
-                {
-                    _propertyAndTableInfos = GetPropertyAndTableInfos<T>();
-                }
-                return _propertyAndTableInfos;
-            }
-        }
+        public virtual Dictionary<PropertyInfo, TableInfo> PropertyAndTableInfos { get; set; } = new Dictionary<PropertyInfo, TableInfo>();
 
         /// <summary>
         /// 实例化<seealso cref="SQLiteTable{T}"/>
@@ -70,21 +58,6 @@ namespace EM.SQLites
                 ret = count;
             }
             return ret;
-        }
-        /// <summary>
-        /// 获取对象
-        /// </summary>
-        /// <param name="index">索引</param>
-        /// <returns>对象</returns>
-        public T GetObject(int index)
-        {
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return default;
-            }
-            List<T> values = GetObjects(index, 1);
-            T t = values.FirstOrDefault();
-            return t;
         }
         /// <summary>
         /// 将数据库的字段值写入指定对象的属性（名称需一致）
@@ -149,17 +122,6 @@ namespace EM.SQLites
                 }
             }
             return t;
-        }
-        /// <summary>
-        /// 根据sql和参数查询数据库，并返回对象集合
-        /// </summary>
-        /// <param name="sql">sql语句</param>
-        /// <param name="parameters">参数</param>
-        /// <returns>对象集合</returns>
-        public List<T> GetObjects(string sql, IEnumerable<DbParameter> parameters = null)
-        {
-            List<T> ret = GetObjects<T>(sql, parameters, PropertyAndTableInfos);
-            return ret;
         }
         /// <summary>
         /// 从数据库读取对象集合
@@ -262,39 +224,6 @@ namespace EM.SQLites
         }
 
         /// <summary>
-        /// 获取对象集合
-        /// </summary>
-        /// <returns>对象集合</returns>
-        public List<T> GetObjects()
-        {
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return new List<T>();
-            }
-            string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index: -1);
-            List<T> ret = GetObjects(sql);
-            return ret;
-        }
-
-        /// <summary>
-        /// 获取对象集合
-        /// </summary>
-        /// <param name="index">索引，为负数时查询所有行</param>
-        /// <param name="count">个数</param>
-        /// <param name="filter">过滤条件</param>
-        /// <returns>对象集合</returns>
-        public List<T> GetObjects(int index = -1, int count = 1, string filter = null)
-        {
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return new List<T>();
-            }
-            string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index, count, filter);
-            List<T> ret = GetObjects(sql);
-            return ret;
-        }
-
-        /// <summary>
         /// 获取插入数据查询语句和参数
         /// </summary>
         /// <param name="tableName">表名</param>
@@ -383,50 +312,6 @@ namespace EM.SQLites
         /// <summary>
         /// 插入对象
         /// </summary>
-        /// <param name="t">对象</param>
-        /// <returns>成功true反之false</returns>
-        public virtual bool Insert(T t)
-        {
-            bool ret = false;
-            if (Connection == null || string.IsNullOrEmpty(Name) || t == null)
-            {
-                return ret;
-            }
-            Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(t);
-            var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
-            var count = Connection.ExecuteNonQueryWithAutoOpen(sqlAndParas.Sql, sqlAndParas.Parameters);
-            ret = count == 1;
-            return ret;
-        }
-        /// <summary>
-        /// 插入对象
-        /// </summary>
-        /// <param name="ts">对象集合</param>
-        /// <param name="useTransaction">使用事务</param>
-        /// <returns>成功个数</returns>
-        public virtual int Insert(IEnumerable<T> ts, bool useTransaction = true)
-        {
-            int ret = 0;
-            if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
-            {
-                return ret;
-            }
-            Connection.Execute(() =>
-           {
-               int count = 0;
-               foreach (var item in ts)
-               {
-                   Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(item);
-                   var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
-                   count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
-                   ret += count;
-               }
-           }, useTransaction);
-            return ret;
-        }
-        /// <summary>
-        /// 插入对象
-        /// </summary>
         /// <param name="fieldAndValuesList">字段和值集合</param>
         /// <param name="useTransaction">使用事务</param>
         /// <returns>成功个数</returns>
@@ -438,15 +323,15 @@ namespace EM.SQLites
                 return ret;
             }
             Connection.Execute(() =>
-           {
-               int count = 0;
-               foreach (var item in fieldAndValuesList)
-               {
-                   var sqlAndParas = GetInsertSql(Name, item);
-                   count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
-                   ret += count;
-               }
-           }, useTransaction);
+            {
+                int count = 0;
+                foreach (var item in fieldAndValuesList)
+                {
+                    var sqlAndParas = GetInsertSql(Name, item);
+                    count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
+                    ret += count;
+                }
+            }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -486,6 +371,302 @@ namespace EM.SQLites
                     ret.Add(propertyInfo, fieldAttribute.TableInfo);
                 }
             }
+            return ret;
+        }
+        /// <summary>
+        /// 获取更新空间数据查询语句和参数
+        /// </summary>
+        /// <param name="tableName">表名</param>
+        /// <param name="dic">列值集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>查询语句和参数</returns>
+        protected (string Sql, List<DbParameter> Parameters) GetUpdateSql(string tableName, Dictionary<TableInfo, object> dic, string filter = null)
+        {
+            (string Sql, List<DbParameter> Parameters) ret = (null, new List<DbParameter>());
+            if (string.IsNullOrEmpty(tableName) || !(dic?.Count > 0))
+            {
+                return ret;
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.Append($"UPDATE {tableName} SET ");
+            for (int i = 0; i < dic.Count; i++)
+            {
+                var item = dic.ElementAt(i);
+                var columnInfo = item.Key;
+                if (columnInfo.PrimaryKey > 0)//跳过主键
+                {
+                    continue;
+                }
+                var value = item.Value;
+                sb.Append(i == 0 ? $"{columnInfo.Name} = " : $",{columnInfo.Name} = ");
+                var sqlAndPara = ColumnAndValueToSql(columnInfo, value);
+                sb.Append(sqlAndPara.SqlValue);
+                if (sqlAndPara.Parameter != null)
+                {
+                    ret.Parameters.Add(sqlAndPara.Parameter);
+                }
+            }
+            if (!string.IsNullOrEmpty(filter))
+            {
+                sb.Append($" WHERE {filter}");
+            }
+            sb.Append(";");
+            ret.Sql = sb.ToString();
+            return ret;
+        }
+
+        /// <summary>
+        /// 获取表信息集合
+        /// </summary>
+        /// <returns>表信息集合</returns>
+        public List<TableInfo> GetTableInfos()
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<TableInfo>();
+            }
+            var sql = SQLiteQueries.GetTableInfoSql(Name);
+            var ret = GetObjects<TableInfo>(sql);
+            return ret;
+        }
+        /// <summary>
+        /// 获取注记集合
+        /// </summary>
+        /// <param name="fields">字段集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>注记集合</returns>
+        public List<Dictionary<string, object>> GetFieldAndValuesList(IEnumerable<string> fields = null, string filter = null)
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<Dictionary<string, object>>();
+            }
+            var ret = Connection.GetFieldAndValuesList(Name, fields, filter);
+            return ret;
+        }
+        /// <summary>
+        /// 读取字段和值集合
+        /// </summary>
+        /// <param name="reader">数据读取器</param>
+        /// <param name="fieldInfos">字段集合</param>
+        /// <returns>字段和值集合</returns>
+        protected Dictionary<TableInfo, object> GetFieldAndValues(DbDataReader reader, IEnumerable<TableInfo> fieldInfos)
+        {
+            var ret = new Dictionary<TableInfo, object>();
+            if (reader == null || fieldInfos == null || fieldInfos.Count() == 0)
+            {
+                return ret;
+            }
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                var fieldName = reader.GetName(i);
+                var fieldInfo = fieldInfos.FirstOrDefault(x => x.Name == fieldName);
+                if (fieldInfo != null && !ret.ContainsKey(fieldInfo))
+                {
+                    var dbValue = reader.GetValue(i);
+                    var destValue = GetObjectFromDb(fieldInfo, dbValue);
+                    ret.Add(fieldInfo, destValue);
+                }
+            }
+            return ret;
+        }
+        /// <summary>
+        /// 从数据库读取指定字段的值
+        /// </summary>
+        /// <param name="fieldInfo">字段信息</param>
+        /// <param name="dbValue">数据库中的值</param>
+        /// <returns>值</returns>
+        protected virtual object GetObjectFromDb(TableInfo fieldInfo, object dbValue)
+        {
+            object ret = null;
+            if (!DBNull.Value.Equals(dbValue))
+            {
+                ret = dbValue;
+            }
+            return ret;
+        }
+        /// <summary>
+        /// 获取注记集合
+        /// </summary>
+        /// <param name="fieldInfos">字段集合</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>注记集合</returns>
+        public List<Dictionary<TableInfo, object>> GetFieldAndValuesList(IEnumerable<TableInfo> fieldInfos, string filter = null)
+        {
+            var ret = new List<Dictionary<TableInfo, object>>();
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return ret;
+            }
+            var fields = fieldInfos?.Select(x => x.Name);
+            var sql = GetSelectSql(Name, fieldInfos, filter: filter);
+            if (Connection == null || string.IsNullOrEmpty(sql))
+            {
+                return ret;
+            }
+            Connection.Execute(() =>
+            {
+                using (var cmd = Connection.CreateCommand())
+                {
+                    cmd.CommandText = sql;
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            var fieldAndValues = GetFieldAndValues(reader, fieldInfos);
+                            if (fieldAndValues != null)
+                            {
+                                ret.Add(fieldAndValues);
+                            }
+                        }
+                        reader.Close();
+                    }
+                }
+            });
+            return ret;
+        }
+        /// <summary>
+        /// 获取创建表的sql
+        /// </summary>
+        /// <returns>sql</returns>
+        public virtual string GetCreateTableSql()
+        {
+            return SQLiteQueries.GetCreateTableSql(Name, PropertyAndTableInfos.Values);
+        }
+    }
+    /// <summary>
+    /// 表
+    /// </summary>
+    /// <typeparam name="T">类或字典。为类时，将带<seealso cref="FieldAttribute"/>特性的公开属性写到数据库/></typeparam>
+    public class SQLiteTable<T> : SQLiteTable where T : Record, new()
+    {
+        /// <inheritdoc/>
+        public override Dictionary<PropertyInfo, TableInfo> PropertyAndTableInfos
+        {
+            get
+            {
+                if (base.PropertyAndTableInfos.Count == 0)
+                {
+                    foreach (var item in GetPropertyAndTableInfos<T>())
+                    {
+                        base.PropertyAndTableInfos.Add(item.Key, item.Value);
+                    }
+                }
+                return base.PropertyAndTableInfos;
+            }
+        }
+
+        /// <summary>
+        /// 实例化<seealso cref="SQLiteTable{T}"/>
+        /// </summary>
+        /// <param name="connection">数据库连接</param>
+        /// <param name="name">表名</param>
+        /// <exception cref="ArgumentNullException">空引用参数异常</exception>
+        public SQLiteTable(DbConnection connection, string name):base(connection, name)
+        { }
+        /// <summary>
+        /// 获取对象
+        /// </summary>
+        /// <param name="index">索引</param>
+        /// <returns>对象</returns>
+        public T GetObject(int index)
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return default;
+            }
+            List<T> values = GetObjects(index, 1);
+            T t = values.FirstOrDefault();
+            return t;
+        }
+
+        /// <summary>
+        /// 根据sql和参数查询数据库，并返回对象集合
+        /// </summary>
+        /// <param name="sql">sql语句</param>
+        /// <param name="parameters">参数</param>
+        /// <returns>对象集合</returns>
+        public List<T> GetObjects(string sql, IEnumerable<DbParameter> parameters = null)
+        {
+            List<T> ret = GetObjects<T>(sql, parameters, PropertyAndTableInfos);
+            return ret;
+        }
+
+        /// <summary>
+        /// 获取对象集合
+        /// </summary>
+        /// <returns>对象集合</returns>
+        public List<T> GetObjects()
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<T>();
+            }
+            string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index: -1);
+            List<T> ret = GetObjects(sql);
+            return ret;
+        }
+
+        /// <summary>
+        /// 获取对象集合
+        /// </summary>
+        /// <param name="index">索引，为负数时查询所有行</param>
+        /// <param name="count">个数</param>
+        /// <param name="filter">过滤条件</param>
+        /// <returns>对象集合</returns>
+        public List<T> GetObjects(int index = -1, int count = 1, string filter = null)
+        {
+            if (Connection == null || string.IsNullOrEmpty(Name))
+            {
+                return new List<T>();
+            }
+            string sql = GetSelectSql(Name, PropertyAndTableInfos.Values, index, count, filter);
+            List<T> ret = GetObjects(sql);
+            return ret;
+        }
+
+        /// <summary>
+        /// 插入对象
+        /// </summary>
+        /// <param name="t">对象</param>
+        /// <returns>成功true反之false</returns>
+        public virtual bool Insert(T t)
+        {
+            bool ret = false;
+            if (Connection == null || string.IsNullOrEmpty(Name) || t == null)
+            {
+                return ret;
+            }
+            Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(t);
+            var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
+            var count = Connection.ExecuteNonQueryWithAutoOpen(sqlAndParas.Sql, sqlAndParas.Parameters);
+            ret = count == 1;
+            return ret;
+        }
+        /// <summary>
+        /// 插入对象
+        /// </summary>
+        /// <param name="ts">对象集合</param>
+        /// <param name="useTransaction">使用事务</param>
+        /// <returns>成功个数</returns>
+        public virtual int Insert(IEnumerable<T> ts, bool useTransaction = true)
+        {
+            int ret = 0;
+            if (Connection == null || string.IsNullOrEmpty(Name) || !(ts?.Count() > 0))
+            {
+                return ret;
+            }
+            Connection.Execute(() =>
+           {
+               int count = 0;
+               foreach (var item in ts)
+               {
+                   Dictionary<TableInfo, object> tableInfoAndValues = GetTableInfoAndValues(item);
+                   var sqlAndParas = GetInsertSql(Name, tableInfoAndValues);
+                   count = Connection.ExecuteNonQuery(sqlAndParas.Sql, sqlAndParas.Parameters);
+                   ret += count;
+               }
+           }, useTransaction);
             return ret;
         }
         /// <summary>
@@ -552,47 +733,6 @@ namespace EM.SQLites
             {
                 throw new NotImplementedException();
             }
-            return ret;
-        }
-        /// <summary>
-        /// 获取更新空间数据查询语句和参数
-        /// </summary>
-        /// <param name="tableName">表名</param>
-        /// <param name="dic">列值集合</param>
-        /// <param name="filter">过滤条件</param>
-        /// <returns>查询语句和参数</returns>
-        protected (string Sql, List<DbParameter> Parameters) GetUpdateSql(string tableName, Dictionary<TableInfo, object> dic, string filter = null)
-        {
-            (string Sql, List<DbParameter> Parameters) ret = (null, new List<DbParameter>());
-            if (string.IsNullOrEmpty(tableName) || !(dic?.Count > 0))
-            {
-                return ret;
-            }
-            StringBuilder sb = new StringBuilder();
-            sb.Append($"UPDATE {tableName} SET ");
-            for (int i = 0; i < dic.Count; i++)
-            {
-                var item = dic.ElementAt(i);
-                var columnInfo = item.Key;
-                if (columnInfo.PrimaryKey > 0)//跳过主键
-                {
-                    continue;
-                }
-                var value = item.Value;
-                sb.Append(i == 0 ? $"{columnInfo.Name} = " : $",{columnInfo.Name} = ");
-                var sqlAndPara = ColumnAndValueToSql(columnInfo, value);
-                sb.Append(sqlAndPara.SqlValue);
-                if (sqlAndPara.Parameter != null)
-                {
-                    ret.Parameters.Add(sqlAndPara.Parameter);
-                }
-            }
-            if (!string.IsNullOrEmpty(filter))
-            {
-                sb.Append($" WHERE {filter}");
-            }
-            sb.Append(";");
-            ret.Sql = sb.ToString();
             return ret;
         }
 
@@ -744,116 +884,6 @@ namespace EM.SQLites
                    ret += count;
                }
            }, useTransaction);
-            return ret;
-        }
-        /// <summary>
-        /// 获取表信息集合
-        /// </summary>
-        /// <returns>表信息集合</returns>
-        public List<TableInfo> GetTableInfos()
-        {
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return new List<TableInfo>();
-            }
-            var sql = SQLiteQueries.GetTableInfoSql(Name);
-            var ret = GetObjects<TableInfo>(sql);
-            return ret;
-        }
-        /// <summary>
-        /// 获取注记集合
-        /// </summary>
-        /// <param name="fields">字段集合</param>
-        /// <param name="filter">过滤条件</param>
-        /// <returns>注记集合</returns>
-        public List<Dictionary<string, object>> GetFieldAndValuesList(IEnumerable<string> fields = null, string filter = null)
-        {
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return new List<Dictionary<string, object>>();
-            }
-            var ret = Connection.GetFieldAndValuesList(Name, fields, filter);
-            return ret;
-        }
-        /// <summary>
-        /// 读取字段和值集合
-        /// </summary>
-        /// <param name="reader">数据读取器</param>
-        /// <param name="fieldInfos">字段集合</param>
-        /// <returns>字段和值集合</returns>
-        protected Dictionary<TableInfo, object> GetFieldAndValues(DbDataReader reader, IEnumerable<TableInfo> fieldInfos)
-        {
-            var ret = new Dictionary<TableInfo, object>();
-            if (reader == null || fieldInfos == null || fieldInfos.Count() == 0)
-            {
-                return ret;
-            }
-            for (int i = 0; i < reader.FieldCount; i++)
-            {
-                var fieldName = reader.GetName(i);
-                var fieldInfo = fieldInfos.FirstOrDefault(x => x.Name == fieldName);
-                if (fieldInfo != null && !ret.ContainsKey(fieldInfo))
-                {
-                    var dbValue = reader.GetValue(i);
-                    var destValue = GetObjectFromDb(fieldInfo, dbValue);
-                    ret.Add(fieldInfo, destValue);
-                }
-            }
-            return ret;
-        }
-        /// <summary>
-        /// 从数据库读取指定字段的值
-        /// </summary>
-        /// <param name="fieldInfo">字段信息</param>
-        /// <param name="dbValue">数据库中的值</param>
-        /// <returns>值</returns>
-        protected virtual object GetObjectFromDb(TableInfo fieldInfo, object dbValue)
-        {
-            object ret = null;
-            if (!DBNull.Value.Equals(dbValue))
-            {
-                ret = dbValue;
-            }
-            return ret;
-        }
-        /// <summary>
-        /// 获取注记集合
-        /// </summary>
-        /// <param name="fieldInfos">字段集合</param>
-        /// <param name="filter">过滤条件</param>
-        /// <returns>注记集合</returns>
-        public List<Dictionary<TableInfo, object>> GetFieldAndValuesList(IEnumerable<TableInfo> fieldInfos, string filter = null)
-        {
-            var ret = new List<Dictionary<TableInfo, object>>();
-            if (Connection == null || string.IsNullOrEmpty(Name))
-            {
-                return ret;
-            }
-            var fields = fieldInfos?.Select(x => x.Name);
-            var sql = GetSelectSql(Name, fieldInfos, filter: filter);
-            if (Connection == null || string.IsNullOrEmpty(sql))
-            {
-                return ret;
-            }
-            Connection.Execute(() =>
-            {
-                using (var cmd = Connection.CreateCommand())
-                {
-                    cmd.CommandText = sql;
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            var fieldAndValues = GetFieldAndValues(reader, fieldInfos);
-                            if (fieldAndValues != null)
-                            {
-                                ret.Add(fieldAndValues);
-                            }
-                        }
-                        reader.Close();
-                    }
-                }
-            });
             return ret;
         }
     }

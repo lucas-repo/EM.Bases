@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
@@ -104,17 +106,17 @@ namespace EM.SQLites
                             var value = propertyInfo.GetValue(this);
                             if (value is SQLiteTable table)
                             {
-                                string tableName = table.Name; 
-                                var tableAttribute = propertyInfo.GetCustomAttribute<TableAttribute>();
-                                if (tableAttribute != null)
-                                {
-                                    tableName = tableAttribute.Name;
-                                }
+                                string tableName = table.Name;
                                 if (string.IsNullOrEmpty(tableName))
                                 {
                                     continue;
                                 }
                                 sb.Append(SQLiteQueries.GetCreateTableSql(tableName, table.PropertyAndTableInfos.Values));
+                                var str = GetCreateIndexString(table);
+                                if (str.Length > 0)
+                                {
+                                    sb.Append(str);
+                                }
                             }
                         }
                     }
@@ -122,6 +124,39 @@ namespace EM.SQLites
                 }
             }
             return ret;
+        }
+        private string GetCreateIndexString(SQLiteTable table)
+        {
+            var type = table.GetType();
+            var propertyInfos = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+            List<FieldAttribute> fields = new List<FieldAttribute>();
+            foreach (var item in propertyInfos)
+            {
+                var field = item.GetCustomAttribute<FieldAttribute>();
+                if (field == null || string.IsNullOrEmpty(field.IndexName))
+                {
+                    continue;
+                }
+                fields.Add(field);
+            }
+            var groupFields = fields.GroupBy(x => x.IndexName);
+            StringBuilder sb = new StringBuilder();
+            foreach (var item in groupFields)
+            {
+                var firstField = item.First();
+                string indexStr = firstField.IsUnique ? $"UNIQUE INDEX" : "INDEX";
+                sb.Append($"CREATE {indexStr} {firstField.IndexName} on {table.Name} (");
+                int i = 0;
+                int count = item.Count();
+                foreach (var field in item)
+                {
+                    sb.Append(i == 0 ? field.TableInfo.Name : $",{field.TableInfo.Name}");
+                    i++;
+                }
+                sb.Append(");");
+            }
+            return sb.ToString();
         }
         /// <summary>
         /// 创数据库
@@ -166,7 +201,7 @@ namespace EM.SQLites
         {
             if (Connection != null && Connection.State != ConnectionState.Open)
             {
-                 Connection.Open();
+                Connection.Open();
             }
         }
         /// <summary>
